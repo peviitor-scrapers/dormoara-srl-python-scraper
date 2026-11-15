@@ -1,0 +1,10 @@
+{
+  "id": "52632530",
+  "company": "DORMOARA S.R.L.",
+  "brand": "Dormoara",
+  "status": "activ",
+  "location": ["Sfântu Gheorghe"],
+  "website": [],
+  "career": ["https://mediere.anofm.ro/app/module/mediere/jobs"],
+  "scraperFile": "https://github.com/peviitor-scrapers/dormoara-srl-python-scraper/actions/workflows/job-seeker-ro-spider.yml"
+}
