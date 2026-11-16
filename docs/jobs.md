@@ -7,9 +7,9 @@
 | CIF | 52632530 |
 | Brand | Dormoara |
 | Career | https://mediere.anofm.ro/app/module/mediere/jobs |
-| LastScraped | 2026-11-15 |
+| LastScraped | 2026-11-16 |
 
-## Jobs (2)
+## Jobs (1)
 
 ### MUNCITOR NECALIFICAT LA ASAMBLAREA, MONTAREA PIESELOR
 
@@ -17,11 +17,5 @@
 - **Location**: SFANTU GHEORGHE
 - **Status**: scraped
 
-### CONFECTIONER-ASAMBLOR ARTICOLE DIN TEXTILE
-
-- **URL**: [https://mediere.anofm.ro/app/module/mediere/job/3447539](https://mediere.anofm.ro/app/module/mediere/job/3447539)
-- **Location**: SFANTU GHEORGHE
-- **Status**: scraped
-
 ---
-_Generated at 2026-11-15T08:32:06Z_
+_Generated at 2026-11-16T14:37:49Z_
