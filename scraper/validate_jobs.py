@@ -8,7 +8,7 @@ Usage:
 import argparse
 import sys
 
-from .api import delete_job_by_url, query_solr
+from .api import delete_job_by_url, map_with_concurrency, query_solr
 from .job_validator import validate_by_browser, validate_by_content, validate_by_head
 from .config import company_config, scraper_config
 
@@ -29,8 +29,7 @@ def main():
     docs = result["docs"]
     print(f"Total jobs in SOLR for CIF {args.cif}: {result['numFound']}")
 
-    invalid = []
-    for i, job in enumerate(docs, start=1):
+    def _check(job):
         url = job.get("url", "")
         if args.mode == "content":
             check = validate_by_content(url)
@@ -38,6 +37,11 @@ def main():
             check = validate_by_browser(url)
         else:
             check = validate_by_head(url)
+        return url, check
+
+    checks = map_with_concurrency(docs, lambda job, _: _check(job))
+    invalid = []
+    for i, (url, check) in enumerate(checks, start=1):
         flag = {"active": "OK", "expired": "EXPIRED", "error": "ERROR"}.get(check["status"], check["status"])
         print(f"[{i}/{len(docs)}] {flag} - {url}")
         if check["status"] != "active":
@@ -59,12 +63,14 @@ def main():
         if not deletable:
             print("  ✅ No invalid board URLs to delete.")
             return 0
-        for url in deletable:
+        def _delete(url):
             try:
                 delete_job_by_url(url)
                 print(f"  Deleted: {url}")
             except Exception as err:
                 print(f"  ⚠️ Failed to delete {url}: {err}")
+
+        map_with_concurrency(deletable, lambda url, _: _delete(url), limit=3)
         return 0
 
     print("Use --delete to remove them, or --dry-run to preview.")

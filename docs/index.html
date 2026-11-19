@@ -384,7 +384,7 @@ let COMPANY_CIF = "52632530";
 
 async function loadCompanyConfig() {
   try {
-    const res = await fetch("./company.json", { cache: "no-cache" });
+    const res = await fetch("./company.json");
     if (!res.ok) return;
     const cfg = await res.json();
     if (cfg.company) COMPANY = cfg.company;
@@ -481,6 +481,22 @@ const saved = localStorage.getItem("peviitor-lang");
 if (saved === "en") setLang("en");
 else setLang("ro");
 
+// Keep the public page cheap: poll every 5 minutes (the old 30s interval
+// issued N+2 API calls per visitor), never overlap two refreshes, and cap
+// pagination so a large result set cannot become an unbounded request loop.
+const MAX_JOB_PAGES = 20;
+let statsInFlight = false;
+
+async function loadStatsIfIdle() {
+  if (statsInFlight) return;
+  statsInFlight = true;
+  try {
+    await loadStats();
+  } finally {
+    statsInFlight = false;
+  }
+}
+
 async function loadStats() {
   try {
     const cRes = await fetch(`https://api.peviitor.ro/v1/company/?cif=${COMPANY_CIF}`, {
@@ -513,7 +529,7 @@ async function loadStats() {
   try {
     let verified = 0;
     let vPage = 1;
-    while (true) {
+    while (vPage <= MAX_JOB_PAGES) {
       const vRes = await fetch(`https://api.peviitor.ro/v1/search/?company=${encodeURIComponent(COMPANY)}&page=${vPage}`, {
         headers: { origin: "https://peviitor.ro", referer: "https://peviitor.ro/" }
       });
@@ -540,7 +556,7 @@ async function loadStats() {
     let ourCount = 0;
     let hasMore = true;
 
-    while (hasMore) {
+    while (hasMore && page <= MAX_JOB_PAGES) {
       const res = await fetch(`https://api.peviitor.ro/v1/search/?company=${encodeURIComponent(COMPANY)}&page=${page}`, {
         headers: { origin: "https://peviitor.ro", referer: "https://peviitor.ro/" }
       });
@@ -581,8 +597,8 @@ async function loadStats() {
   }
 }
 
-loadCompanyConfig().then(loadStats);
-setInterval(loadStats, 30000);
+loadCompanyConfig().then(loadStatsIfIdle);
+setInterval(loadStatsIfIdle, 300000);
 </script>
 </body>
 </html>

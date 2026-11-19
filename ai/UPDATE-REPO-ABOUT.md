@@ -5,7 +5,7 @@ Keep the GitHub repository metadata up to date.
 ## Description
 
 Scraper automat pentru locurile de muncă DORMOARA S.R.L. (CIF: 52632530) — extrage
-de pe mediere.anofm.ro și publică pe peviitor.ro
+de pe mediere.anofm.ro, validează via CUIScan/CUIFirma și publică pe peviitor.ro
 
 ## Homepage
 
@@ -24,7 +24,7 @@ https://peviitor-scrapers.github.io/dormoara-srl-python-scraper/
 
 ```bash
 gh repo edit peviitor-scrapers/dormoara-srl-python-scraper \
-  --description "Scraper automat pentru locurile de muncă DORMOARA S.R.L. (CIF: 52632530) — extrage de pe mediere.anofm.ro și publică pe peviitor.ro" \
+  --description "Scraper automat pentru locurile de muncă DORMOARA S.R.L. (CIF: 52632530) — extrage de pe mediere.anofm.ro, validează via CUIScan/CUIFirma și publică pe peviitor.ro" \
   --homepage "https://peviitor-scrapers.github.io/dormoara-srl-python-scraper/"
 ```
 

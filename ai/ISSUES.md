@@ -26,7 +26,7 @@ Vezi [toate issue-urile](https://github.com/peviitor-scrapers/dormoara-srl-pytho
 | Symptom | Likely cause | Action |
 |---------|--------------|--------|
 | `0` jobs parsed | ANOFM response/query changed | Check `search_anofm` in `scraper/anaf.py` |
-| Company INACTIVE | ANAF status change | Do not scrape; jobs get deleted |
+| Company name mismatch | CUIScan / company-core spelling drift | Compare the CUIScan legal name with the company-core record; `status` is config-only and never deletes jobs |
 | API 401/403 | Token/endpoint change | Check `scraper/api.py` |
 | Tests fail offline | Network-dependent test | Ensure `pytest.skip` on unreachable hosts |
 | Validator flags live jobs EXPIRED | Keyword hit inside bundled JS | Content check strips `<script>`/`<style>` — check `scraper/job_validator.py` |

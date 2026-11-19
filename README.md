@@ -20,9 +20,9 @@ The project automates the daily collection of DORMOARA jobs in Romania, keeping 
 ## Features
 
 - Extracts jobs from ANOFM (`mediere.anofm.ro`) by company CIF
-- Validates the company via ANAF (CUI, active/inactive status, full address) with CUIScan fallback
-- **ANAF cache** — does not hit the APIs on every scrape
-- **Stale cache / config fallback** when ANAF is unavailable
+- Validates the company via CUIScan (legal name and address, by CIF) and CUIFirma (brand search)
+- **Company cache** — does not hit the APIs on every scrape
+- **Stale cache / config fallback** when CUIScan is unavailable
 - Cross-validates against the Peviitor API
 - Deletes stale jobs (present on the site but not in Peviitor)
 - Stores to the Peviitor API (job core + company core)
@@ -30,6 +30,15 @@ The project automates the daily collection of DORMOARA jobs in Romania, keeping 
 - **Company identity in a single file** (`scraper/config/company.json`)
 - GitHub Actions: daily scrape + automated testing (unit, integration, e2e, consistency)
 - Identifies itself through the User-Agent: `job_seeker_ro_spider`
+
+## Local setup
+
+```bash
+python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements.txt
+.venv/bin/python -m pytest tests/unit tests/consistency   # offline checks
+.venv/bin/python -m scraper.index                         # full scrape + publish
+```
 
 ## License
 

@@ -18,8 +18,11 @@ on:
 jobs:
   validate-jobs:
     runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
     needs: Automation-Tests
+    # On the daily schedule Automation-Tests is intentionally skipped, so
+    # `always()` is needed to let this job run. Manual dispatch keeps the old
+    # ordering: validation only runs after the full suite has passed.
+    if: always() && (github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && needs.Automation-Tests.result == 'success'))
 
     steps:
       - uses: actions/checkout@v7
@@ -28,6 +31,7 @@ jobs:
         uses: actions/setup-python@v7
         with:
           python-version: '3.12'
+          cache: 'pip'
 
       - name: Install dependencies
         run: |
@@ -49,6 +53,9 @@ jobs:
 
   ensure-company-core:
     runs-on: ubuntu-latest
+    # The daily schedule only runs validate-jobs; company core is already
+    # reconciled by the scrape workflow and on every push/PR here.
+    if: github.event_name != 'schedule'
 
     steps:
       - uses: actions/checkout@v7
@@ -107,6 +114,7 @@ jobs:
         uses: actions/setup-python@v7
         with:
           python-version: '3.12'
+          cache: 'pip'
 
       - name: Sync with remote
         if: github.event_name != 'pull_request'
@@ -225,4 +233,16 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add docs/test-results/
           git commit -m "[skip ci] Update test results" || echo "No changes to commit"
-          git push || echo "Push failed (race condition) — will be picked up next run"
+          # The scrape workflow publishes the same docs; rebase and retry
+          # rather than losing freshly generated reports to a concurrent push.
+          pushed=false
+          for attempt in 1 2 3; do
+            git fetch origin main || break
+            if git rebase -X theirs origin/main; then
+              if git push origin HEAD:main; then pushed=true; break; fi
+            else
+              git rebase --abort || true
+            fi
+            sleep 5
+          done
+          if [ "$pushed" != "true" ]; then echo "Push failed after 3 attempts"; fi

@@ -1,47 +1,49 @@
-"""Unit tests for ANAF integration with mocked HTTP."""
+"""Unit tests for company data integration with mocked HTTP."""
 
 from unittest import mock
+
+import pytest
 
 from scraper import anaf
 
 
-def test_get_company_from_anaf_cuiscan_first(mock_get):
-    mock_get.side_effect = [
-        mock.Mock(status_code=200, json=lambda: {
-            "denumire": "DORMOARA S.R.L.", "cui": "52632530",
-            "adresa": "CLUJ-NAPOCA", "activ": True}),
-    ]
+def test_get_company_from_anaf_cuiscan_only(mock_get):
+    mock_get.return_value = mock.Mock(json=lambda: {
+        "denumire": "DORMOARA S.R.L.", "cui": "52632530",
+        "adresa": "CLUJ-NAPOCA", "activ": True})
     company = anaf.get_company_from_anaf("52632530")
+    assert mock_get.call_count == 1
+    assert "cuiscan.ro" in mock_get.call_args.args[0]
     assert company["denumire"] == "DORMOARA S.R.L."
-    assert company["stareInregistrare"] == "INREGISTRAT"
+    assert company["cif"] == "52632530"
+    assert "stareInregistrare" not in company
 
 
-def test_get_company_from_anaf_demoanaf_fallback(mock_get):
-    mock_get.side_effect = [
-        mock.Mock(status_code=500, raise_for_status=mock.Mock(side_effect=Exception("http"))),
-        mock.Mock(status_code=200, json=lambda: {
-            "denumire": "DORMOARA S.R.L.", "cif": "52632530",
-            "adresa": "CLUJ-NAPOCA", "stareInregistrare": "INREGISTRAT"}),
-    ]
-    company = anaf.get_company_from_anaf("52632530")
-    assert company["denumire"] == "DORMOARA S.R.L."
-    assert company["stareInregistrare"] == "INREGISTRAT"
-
-
-def test_get_company_from_anaf_skips_payment_error(mock_get):
-    mock_get.side_effect = [
-        mock.Mock(status_code=200, json=lambda: {"error": "payment_required", "accepts": []}),
-        mock.Mock(status_code=200, json=lambda: {
-            "denumire": "DORMOARA S.R.L.", "cui": "52632530",
-            "adresa": "CLUJ-NAPOCA", "activ": True}),
-    ]
-    company = anaf.get_company_from_anaf("52632530")
-    assert company["denumire"] == "DORMOARA S.R.L."
-
-
-def test_get_company_from_anaf_returns_none_on_total_failure(mock_get):
+def test_get_company_from_anaf_returns_none_on_network_failure(mock_get):
     mock_get.side_effect = Exception("network")
     assert anaf.get_company_from_anaf("52632530") is None
+
+
+def test_get_company_from_anaf_no_data_is_fatal(mock_get):
+    mock_get.return_value = mock.Mock(json=lambda: {})
+    with pytest.raises(RuntimeError, match="no data"):
+        anaf.get_company_from_anaf_with_fallback("52632530", cached={"52632530": {"denumire": "cached"}})
+
+
+def test_get_company_from_anaf_with_fallback_uses_cache_on_network_failure(mock_get):
+    mock_get.side_effect = Exception("network")
+    cached = {"52632530": {"denumire": "DORMOARA S.R.L.", "cif": "52632530"}}
+    company = anaf.get_company_from_anaf_with_fallback("52632530", cached=cached)
+    assert company == cached["52632530"]
+
+
+def test_search_company_uses_cuifirma_only(mock_get):
+    mock_get.return_value = mock.Mock(json=lambda: {
+        "results": [{"cui": 52632530, "name": "Dormoara", "is_active": True}]})
+    results = anaf.search_company("Dormoara")
+    assert mock_get.call_count == 1
+    assert "cuifirma.ro" in mock_get.call_args.args[0]
+    assert results == [{"cui": "52632530", "name": "Dormoara", "statusLabel": ""}]
 
 
 def test_search_anofm_parses_rows(mock_post):
@@ -73,4 +75,4 @@ def test_validate_and_get_company_falls_back_to_config(monkeypatch, company_conf
     result = company.validate_and_get_company()
     assert result["company"] == company_config["company"]
     assert result["cif"] == company_config["id"]
-    assert result["status"] == "active"
+    assert "status" not in result

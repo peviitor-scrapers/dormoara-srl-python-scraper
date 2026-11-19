@@ -35,10 +35,10 @@ def test_anaf_returns_company():
         pytest.skip("cuiscan.ro not reachable")
     company = anaf.get_company_from_anaf(COMPANY_CIF)
     if company is None:
-        pytest.skip("ANAF APIs unavailable")
+        pytest.skip("CUIScan unavailable")
     assert company["denumire"] == COMPANY_NAME
     assert company["cif"] == COMPANY_CIF
-    assert company["stareInregistrare"] == "INREGISTRAT"
+    assert "stareInregistrare" not in company
 
 
 def test_search_anofm_for_company():
@@ -55,7 +55,7 @@ def test_peviitor_company_core_exists(peviitor_api_reachable):
         pytest.skip("peviitor API not reachable")
     company = anaf.get_company_from_anaf(COMPANY_CIF)
     if company is None:
-        pytest.skip("ANAF APIs unavailable")
+        pytest.skip("CUIScan unavailable")
     from scraper.api import get_company_by_cif
     result = get_company_by_cif(COMPANY_CIF)
     if result is None:

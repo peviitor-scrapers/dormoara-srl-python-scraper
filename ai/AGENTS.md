@@ -18,7 +18,7 @@ peviitor Python scraper template and must follow the same API contract.
 4. Edit `scraper/config/company.json` — it is the single source of truth.
 5. Run `python3 -m pytest tests/unit tests/consistency` before pushing.
 6. Do not add comments unless they explain *why*.
-7. Do not commit secrets, `jobs.json`, or the ANAF cache.
+7. Do not commit secrets, `jobs.json`, or the company-cache files.
 8. **Every code change must have a corresponding GitHub issue** (see
    [ISSUES.md](ISSUES.md)) — create the issue before implementing, and
    reference it in the commit message (e.g. `fix: #12 ...`). Exceptions:
@@ -61,6 +61,10 @@ reasons:
 - `scraper/markdown_generator.py`
 - `scraper/validate_jobs.py`
 
+Exception: issue #4 intentionally updated `anaf.py` and `company.py` to retire
+the obsolete company-data endpoint and the company-status job-deletion path.
+Derived scrapers should keep the current generic versions of those modules.
+
 Company-specific logic belongs in `scraper/index.py` and
 `scraper/config/*.json`. If a template-wide bug is found in a shared
 module, file an issue and sync the fix back to the source template.
@@ -85,5 +89,5 @@ python3 -m scraper.validate_jobs 52632530 --mode head  # validate job URLs
 
 - `scraper/index.py` — entry point and orchestration.
 - `scraper/api.py` — peviitor v1 client.
-- `scraper/anaf.py` — ANAF + CUIScan company validation.
+- `scraper/anaf.py` — CUIScan/CUIFirma company data (no external ANAF endpoint).
 - `scraper/config/company.json` — company identity/config.

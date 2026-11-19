@@ -154,3 +154,36 @@ def test_run_verification_delete_requires_prefix(monkeypatch):
     api.run_verification("52632530", delete=True, prefix=None)
 
     delete_mock.assert_not_called()
+
+
+def test_run_verification_delete_passes_only_url(monkeypatch):
+    deleted = []
+    monkeypatch.setattr(api, "query_solr", lambda cif: {
+        "numFound": 1,
+        "docs": [{"url": BOARD + "dead1", "location": [], "workmode": None, "title": "A"}],
+    })
+    monkeypatch.setattr(api, "check_url", lambda url: {"url": url, "status": 404, "valid": False})
+    monkeypatch.setattr(api, "delete_job_by_url", lambda url: deleted.append(url))
+
+    api.run_verification("52632530", delete=True, prefix=BOARD)
+
+    assert deleted == [BOARD + "dead1"]
+
+
+def test_query_solr_retries_transient_failure(monkeypatch, mock_get):
+    monkeypatch.setattr(api.time, "sleep", lambda seconds: None)
+    mock_get.side_effect = [
+        mock.Mock(status_code=500, text="boom"),
+        mock.Mock(status_code=200, json=lambda: {"success": True, "total": 1, "data": [{"url": "u"}]}),
+    ]
+    result = api.query_solr("52632530")
+    assert result["numFound"] == 1
+    assert mock_get.call_count == 2
+
+
+def test_map_with_concurrency_preserves_order():
+    assert api.map_with_concurrency([1, 2, 3], lambda item, i: item * 2, limit=2) == [2, 4, 6]
+
+
+def test_cif_wide_delete_helper_removed():
+    assert not hasattr(api, "delete_jobs_by_cif")

@@ -14,17 +14,16 @@ Company document published to the peviitor company core (`/v1/firme/company/`).
 | `company`    | string | Legal name from Trade Register (UPPERCASE, diacritics required)    |
 | `brand`      | string | Public brand name                                                  |
 | `group`      | string | Parent company group (optional)                                    |
-| `status`     | string | `activ` / `suspendat` / `inactiv` / `radiat`                       |
+| `status`     | string | `activ` / `suspendat` / `inactiv` / `radiat`. Config value only — this scraper never deletes jobs or the company based on status (#4) |
 | `location`   | array  | Romanian cities/addresses (diacritics accepted)                    |
-| `website`    | array  | Company website (canonical HTTP/HTTPS URL)                         |
-| `career`     | array  | Careers/board URL (canonical HTTP/HTTPS URL)                       |
+| `website`    | array  | Company website (canonical HTTP/HTTPS URL, no trailing slash)      |
+| `career`     | array  | Careers/board URL (canonical HTTP/HTTPS URL, no trailing slash)    |
 | `lastScraped`| string | Date of last scrape (ISO 8601)                                     |
 | `scraperFile`| string | GitHub Actions workflow URL (no raw)                               |
 
 ## Notes
 
 - Fields marked `array` are multi-valued arrays stored as arrays in SOLR.
-- `status = "activ"` means jobs are kept; otherwise jobs are removed.
 - `website` and `career` should be canonical URLs without a trailing slash.
 - `scraperFile` must be the full workflow URL, not the raw file URL.
 
@@ -32,7 +31,7 @@ Company document published to the peviitor company core (`/v1/firme/company/`).
 
 `upsert_company` passes the CIF **as-is** (no zero-padding, per AGENTS.md
 commandment 2) and PUTs to `/v1/firme/company/add/`. The live
-address/location from ANAF (CUIScan) takes precedence over the static
+address/location from CUIScan takes precedence over the static
 config when available.
 
 ## Example

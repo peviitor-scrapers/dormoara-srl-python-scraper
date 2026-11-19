@@ -50,16 +50,16 @@ When working on this scraper:
 ## Workflow Steps
 
 1. **Start with brand** — `Dormoara`
-2. **Search in ANAF/CUIScan** — find company by CIF `52632530`
-3. **Get company details from ANAF** — fetch full company data via CUIScan → demoanaf → cache
+2. **Search in CUIFirma** — resolve the brand to a CIF
+3. **Get company details from CUIScan** — fetch the legal name and address by CIF
 4. **Validate with Peviitor** — verify company exists in peviitor
 5. **Check existing jobs** — query peviitor v1 API by CIF to see what jobs exist
-6. **Check company status** — if ANAF status = INACTIVE → DELETE existing jobs and STOP
-7. **Scrape new jobs** — query the ANOFM public job posting API by `employer_tax_code`
-8. **Transform for API** — validate and fix job data:
+6. **Scrape new jobs** — query the ANOFM public job posting API by `employer_tax_code`
+7. **Transform for API** — validate and fix job data:
    - location: only Romanian cities allowed (fallback `["România"]`)
    - workmode: `remote` / `on-site` / `hybrid`
    - company: uppercase
+8. **Check live URLs** — GET-check each job, drop HTTP and soft-404s; abort before any write if nothing survives
 9. **Upsert to API** — import/update jobs via peviitor v1 API
 10. **Verify URLs** — check existing ANOFM job URLs still work, delete stale ones
 
@@ -68,6 +68,9 @@ When working on this scraper:
 ```bash
 # Run the full scraper workflow (single command)
 python3 -m scraper.index
+
+# Get company details from CUIScan by CIF
+python3 -c "from scraper.anaf import get_company_from_anaf; print(get_company_from_anaf('52632530'))"
 ```
 
 > **Important**: Stale deletion is scoped to the ANOFM job URL prefix
@@ -79,14 +82,15 @@ python3 -m scraper.index
 When running `python3 -m scraper.index`, the following steps happen automatically:
 
 1. **Check existing jobs count** — query peviitor v1 API by CIF (read-only)
-2. **Validate company via ANAF** — check company exists and is active
-3. **Upsert company core** — with `scraperFile` pointing to our workflow
-4. **Scrape jobs** — query the ANOFM API by CIF
-5. **Transform for API** — fix locations (only Romanian cities), normalize workmode
-6. **Generate files** — `scraper/jobs.json`, `docs/jobs.md`, `docs/company.json`
-7. **Upsert to API** — add/update jobs (API handles duplicates by URL)
-8. **Delete stale jobs** — remove ANOFM jobs no longer published
-9. **Show Summary** — log job counts
+2. **Validate company via CUIScan/CUIFirma** — resolve legal name and address, refresh the company cache
+3. **Scrape jobs** — query the ANOFM API by CIF, deduplicating URLs
+4. **Transform for API** — fix locations (only Romanian cities), normalize workmode
+5. **Check live URLs** — bounded GET checks; soft-404 pages are dropped; canary aborts before any write if no jobs remain
+6. **Upsert company core** — with `scraperFile` pointing to our workflow
+7. **Generate files** — `scraper/jobs.json`, `docs/jobs.md`, `docs/company.json`
+8. **Upsert to API** — add/update jobs (API handles duplicates by URL)
+9. **Delete stale jobs** — remove ANOFM jobs no longer published
+10. **Show Summary** — log job counts
 
 ## Workflow Flowchart
 
@@ -100,21 +104,22 @@ scraper/index.py
 query_solr(CIF) - check existing jobs (peviitor v1 API)
     │
     ▼
-company.py / anaf.py (validate company)
-    ├── CUIScan ──► get company name + CIF
-    ├── demoanaf ─► fallback
+company.py / anaf.py (resolve company identity)
+    ├── CUIScan ──► get company name + address by CIF
+    ├── CUIFirma ──► brand search / CIF resolution
     ├── anaf_cache.json ──► fallback if APIs fail
     │
-    ▼ (if active)
-search_anofm(CIF) - POST vw_public_job_posting
+    ▼
+search_anofm(CIF) - POST vw_public_job_posting (URLs deduplicated)
     │
     ▼
-transform_jobs_for_solr()
+transform_jobs_for_solr() + drop_dead_urls()
     ├── Filter: keep only Romanian locations
     ├── Fallback: "România" for unknown
-    └── Normalize: uppercase company
+    ├── Normalize: uppercase company
+    └── GET check: drop HTTP errors and soft-404s (max 5 in flight)
     │
-    ▼
+    ▼ (canary: abort before any write if no live jobs)
 upsert_jobs() - API handles duplicate by URL
     │
     ▼
@@ -135,12 +140,12 @@ See `ai/files.md` for the full file map. Key files:
 | `scraper/config/scraper.json` | API config — `apiBase`, `apiPath`, `jobDetailsPrefix` |
 | `scraper/index.py` | Main entry point — validate company → scrape ANOFM → transform → upsert → delete stale → generate `docs/jobs.md` |
 | `scraper/api.py` | Peviitor v1 API client — query/upsert/delete jobs + company |
-| `scraper/anaf.py` | Company validation + `search_anofm` — CUIScan + demoanaf + cache fallback |
+| `scraper/anaf.py` | Company data module — CUIScan (details by CIF) + CUIFirma (brand search) + cache fallback, plus `search_anofm` |
 | `scraper/job_validator.py` | Shared URL validation primitives (head/content/browser) |
 | `scraper/validate_jobs.py` | CLI deep validator (`--mode head|content|browser`, `--delete`) |
 | `scraper/markdown_generator.py` | Generates `docs/jobs.md` |
 | `tests/unit/*` | Unit tests for index/api/anaf/config/job_validator |
-| `tests/integration/test_company_real.py` | Live integration — ANAF + ANOFM + peviitor API |
+| `tests/integration/test_company_real.py` | Live integration — CUIScan/CUIFirma + ANOFM + peviitor API |
 | `tests/e2e/test_scraper.py` | E2E — live ANOFM scrape |
 | `tests/consistency/test_repo.py` | Repo identity, root files, workflow naming |
 
@@ -148,22 +153,22 @@ See `ai/files.md` for the full file map. Key files:
 
 - **ANOFM search**: `https://mediere.anofm.ro/api/entity/vw_public_job_posting` — POST by `employer_tax_code`
 - **ANOFM job URL**: `https://mediere.anofm.ro/app/module/mediere/job/<id>`
-- **CUIScan**: `https://cuiscan.ro/api.php?action=company&cui=CIF` — company details fallback
-- **DemoANAF**: `https://demoanaf.ro/api/company/:cui` — company details fallback
-- **CUIFirma search**: `https://www.cuifirma.ro/api/search?q=BRAND` — search fallback
+- **CUIScan**: `https://cuiscan.ro/api.php?action=company&cui=CIF` — company details by CIF
+- **CUIFirma search**: `https://www.cuifirma.ro/api/search?q=BRAND` — search companies by brand
 - **Peviitor v1 API**: `https://api.peviitor.ro/v1/` — all job and company operations go through this API (no direct Solr)
 
 ## Rate Limiting & Politeness
 
-The scraper is intentionally slow to be a good citizen:
+The scraper stays polite without fixed per-page sleeps:
 
 | Setting | Value | Where |
 |---------|-------|-------|
 | Request timeout | 10 s | `scraper/api.py`, `scraper/anaf.py` — `TIMEOUT` |
-| ANAF fallback | 1 attempt CUIScan → demoanaf → cache | `scraper/anaf.py` — no retries, just fallback |
-| Concurrency | 1 (sequential) | No parallel fetches |
+| Company data | CUIScan / CUIFirma, no retries | `scraper/anaf.py` — cache in `scraper/anaf_cache.json` |
+| Concurrency | max 5 in flight | `scraper/api.py` / `scraper/index.py` — `map_with_concurrency` for URL checks and deletes |
+| API reads | 3 attempts with backoff on transient failures | `scraper/api.py` — `_request_with_retry` |
 | User-Agent | `job_seeker_ro_spider` | Identifies the scraper in server logs |
-| Extra requests | Only per-job HEAD/content checks during validation | `scraper/validate_jobs.py` |
+| Extra requests | One GET per job before upload, reused by validators | `scraper/index.py` / `scraper/validate_jobs.py` |
 
 Respect `robots.txt` when present; do not crawl aggressively.
 
@@ -174,7 +179,8 @@ Respect `robots.txt` when present; do not crawl aggressively.
 | `GITHUB_REPOSITORY` | Used by consistency tests — format `owner/repo` |
 | `GITHUB_TOKEN` | GitHub API token for consistency tests |
 
-Never commit secrets or `.env` files.
+`.env` files are not used — all API access goes through `api.peviitor.ro`
+and needs no credentials. Never commit secrets or `.env` files.
 
 ## Standalone Commands
 

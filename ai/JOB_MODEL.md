@@ -8,15 +8,15 @@ Standardized job document published to peviitor SOLR.
 |-----------------|----------|--------------------------------------------------------------------|
 | `url`           | yes      | Canonical job URL (valid HTTP/HTTPS)                               |
 | `title`         | yes      | Position title — max 200 chars, no HTML, trimmed whitespace        |
-| `company`       | no       | Company name (UPPERCASE, diacritics allowed)                       |
+| `company`       | no       | Full legal name, UPPERCASE, diacritics allowed; must match `Company.company` case-insensitively |
 | `cif`           | no       | Company CIF, as-is (8 digits, no zero-padding)                     |
 | `location`      | no       | Array of Romanian cities (diacritics accepted)                     |
 | `tags`          | no       | Lowercase keywords, max 20 entries, NO diacritics                  |
 | `workmode`      | no       | `remote` / `on-site` / `hybrid`                                     |
 | `date`          | no       | ISO 8601 (`YYYY-MM-DDThh:mm:ssZ`)                                   |
 | `status`        | no       | `scraped`                                                           |
-| `vdate`         | no       | Verification date (ISO)                                             |
-| `expirationdate`| no       | Expiration date (ISO)                                               |
+| `vdate`         | no       | Validation date (ISO). Set only when status becomes `tested` or `verified` |
+| `expirationdate`| no       | Expiration date (ISO), at most `vdate` + 30 days or from the job page |
 | `salary`        | no       | Salary info as string, e.g. `"5000-8000 RON"` (not an array)        |
 
 ## Status flow

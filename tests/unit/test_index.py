@@ -46,23 +46,27 @@ def test_transform_jobs_for_solr_missing_location_fallback():
     assert transformed["jobs"][0]["location"] == ["România"]
 
 
+def _stub_main(monkeypatch, tmp_path, raw_jobs):
+    monkeypatch.setattr(index, "query_solr", lambda cif: {"numFound": 0, "docs": []})
+    monkeypatch.setattr(index, "upsert_jobs", lambda jobs: None)
+    monkeypatch.setattr(index, "delete_job_by_url", lambda url: None)
+    monkeypatch.setattr(index, "upsert_company", lambda cfg: None)
+    monkeypatch.setattr(index, "validate_and_get_company", lambda: {
+        "company": "DORMOARA S.R.L.", "cif": "52632530", "address": "SFÂNTU GHEORGHE"})
+    monkeypatch.setattr(index, "search_anofm", lambda cif: raw_jobs)
+    monkeypatch.setattr(index, "drop_dead_urls", lambda jobs: jobs)
+    return tmp_path
+
+
 def test_main_writes_summary(tmp_path, monkeypatch):
     fake_jobs = [
         {"url": f"https://mediere.anofm.ro/app/module/mediere/job/{i}",
          "title": f"Job {i}", "location": ["Sfântu Gheorghe"]}
         for i in range(3)
     ]
-    monkeypatch.setattr(index, "query_solr", lambda cif: {"numFound": 0, "docs": []})
-    monkeypatch.setattr(index, "upsert_jobs", lambda jobs: None)
-    monkeypatch.setattr(index, "delete_job_by_url", lambda url: None)
-    monkeypatch.setattr(index, "upsert_company", lambda cfg: None)
-    monkeypatch.setattr(index, "validate_and_get_company", lambda: {
-        "company": "DORMOARA S.R.L.", "cif": "52632530", "status": "active",
-        "address": "SFÂNTU GHEORGHE"})
-    monkeypatch.setattr(index, "search_anofm", lambda cif: fake_jobs)
-    monkeypatch.setattr(index.time, "sleep", lambda s: None)
+    root = _stub_main(monkeypatch, tmp_path, fake_jobs)
 
-    index.main(root=tmp_path)
+    index.main(root=root)
 
     out = tmp_path / "scraper" / "jobs.json"
     assert out.exists()
@@ -72,15 +76,33 @@ def test_main_writes_summary(tmp_path, monkeypatch):
     assert (tmp_path / "docs" / "jobs.md").exists()
 
 
-def test_main_inactive_company_skips_scrape(tmp_path, monkeypatch):
-    deleted = []
-    monkeypatch.setattr(index, "query_solr", lambda cif: {"numFound": 1, "docs": []})
-    monkeypatch.setattr(index, "validate_and_get_company", lambda: {
-        "company": "DORMOARA S.R.L.", "cif": "52632530", "status": "inactive"})
-    monkeypatch.setattr(index, "delete_jobs_by_cif", lambda cif: deleted.append(cif))
-    monkeypatch.setattr(index, "search_anofm",
-                        lambda cif: (_ for _ in ()).throw(AssertionError("should not scrape")))
+def test_main_dedupes_anofm_urls(tmp_path, monkeypatch):
+    job = {"url": "https://mediere.anofm.ro/app/module/mediere/job/1", "title": "Job"}
+    root = _stub_main(monkeypatch, tmp_path, [job, dict(job)])
 
-    index.main(root=tmp_path)
+    index.main(root=root)
 
-    assert deleted == ["52632530"]
+    data = json.loads((tmp_path / "scraper" / "jobs.json").read_text(encoding="utf-8"))
+    assert len(data["jobs"]) == 1
+
+
+def test_main_canary_aborts_before_any_write(tmp_path, monkeypatch):
+    upserted = []
+    root = _stub_main(monkeypatch, tmp_path, [])
+    monkeypatch.setattr(index, "upsert_jobs", lambda jobs: upserted.append(jobs))
+    monkeypatch.setattr(index, "upsert_company", lambda cfg: (_ for _ in ()).throw(AssertionError("no write")))
+
+    index.main(root=root)
+
+    assert upserted == []
+    assert not (tmp_path / "scraper" / "jobs.json").exists()
+
+
+def test_drop_dead_urls_drops_soft_404(monkeypatch):
+    good = {"url": "https://x/good", "title": "Good"}
+    old = {"url": "https://x/old", "title": "Old"}
+    monkeypatch.setattr(index, "validate_by_content", lambda url: {
+        "url": url, "status": "active" if url.endswith("good") else "expired",
+        "http_status": 200, "error": None})
+
+    assert index.drop_dead_urls([good, old]) == [good]

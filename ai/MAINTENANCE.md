@@ -20,7 +20,7 @@ appropriate, and move on.
 ## Routine
 
 - The scheduled `job-seeker-ro-spider.yml` workflow scrapes daily.
-- If the scrape fails, check: ANOFM reachability, ANAF API status, API response.
+- If the scrape fails, check: ANOFM reachability, CUIScan/CUIFirma status, API response.
 - Validate job URLs periodically:
 
 ```bash
@@ -46,7 +46,8 @@ Adjust `search_anofm` in `scraper/anaf.py` and the expected count in
 Edit `scraper/config/company.json` only. Run the scraper to regenerate
 `docs/company.json`.
 
-## ANAF outages
+## CUIScan outages
 
-`get_company_from_anaf` falls back demoanaf.ro → cuiscan.ro → cache
-(`scraper/anaf_cache.json`). If all fail, the scraper errors clearly.
+`get_company_from_anaf` uses CUIScan only and falls back to
+`scraper/anaf_cache.json` on network/HTTP errors. An empty or nameless CUIScan
+response is fatal — scraping cannot proceed without a verified legal name.

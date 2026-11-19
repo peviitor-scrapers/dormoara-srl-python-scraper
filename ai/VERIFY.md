@@ -2,13 +2,27 @@
 
 How to verify the scraper works.
 
+## Local setup
+
+```bash
+python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements.txt
+source .venv/bin/activate   # apoi comenzile de mai jos folosesc python3 din venv
+```
+
 ## Offline
 
 ```bash
-python3 -m pytest tests/unit tests/consistency
+python3 -m pytest tests/unit tests/consistency   # all fast suites
+# SAU, când vrei o singură suită:
+python3 -m pytest tests/integration              # live APIs (skip-safe)
+python3 -m pytest tests/e2e                      # live ANOFM (skip-safe)
+python3 -m pytest                                # everything
 ```
 
-Expect: all green, no network needed.
+Expect: all green, no network needed for the unit/consistency suites. The full
+live publish (`python3 -m scraper.index`) is manual and is not part of the test
+suite.
 
 ## Live — company
 
