@@ -7,7 +7,7 @@
 | CIF | 52632530 |
 | Brand | Dormoara |
 | Career | https://mediere.anofm.ro/app/module/mediere/jobs |
-| LastScraped | 2026-11-24 |
+| LastScraped | 2026-11-25 |
 
 ## Jobs (1)
 
@@ -18,4 +18,4 @@
 - **Status**: scraped
 
 ---
-_Generated at 2026-11-24T16:54:58Z_
+_Generated at 2026-11-25T16:43:17Z_
